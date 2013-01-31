@@ -8,7 +8,10 @@ import java.net.URL;
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.implementations.AdjacencyListGraph;
 import org.graphstream.stream.SourceBase;
+import org.graphstream.stream.db.DatabaseConnectionException;
+import org.graphstream.stream.db.DatabaseSource;
 import org.graphstream.stream.file.FileSource;
+import org.graphstream.util.VerboseSink;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
@@ -18,30 +21,20 @@ import org.neo4j.graphdb.event.TransactionEventHandler;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.tooling.GlobalGraphOperations;
 
-public class Neo4JSource extends SourceBase implements FileSource,
+public class Neo4JSource extends SourceBase implements DatabaseSource,
 		TransactionEventHandler<Object> {
 	GraphDatabaseFactory factory;
 	GraphDatabaseService graphDb;
 
 	public Neo4JSource() {
 		factory = new GraphDatabaseFactory();
+		Runtime.getRuntime().addShutdownHook(new CloseDbOnExit());
 	}
 
-	protected void openDB(String path) {
-		if (graphDb != null)
-			throw new RuntimeException("A graph database is already opened");
-
-		graphDb = factory.newEmbeddedDatabase(path);
-		graphDb.registerTransactionEventHandler(this);
-	}
-
-	protected void closeDB() {
-		if (graphDb == null)
-			throw new RuntimeException("No graph database is opened");
-
-		graphDb.shutdown();
-	}
-
+	/**
+	 * Read all the database content and produce events that describe the
+	 * current graph state.
+	 */
 	protected void flushDB() {
 		if (graphDb == null)
 			return;
@@ -50,72 +43,54 @@ public class Neo4JSource extends SourceBase implements FileSource,
 
 		try {
 			GlobalGraphOperations op = GlobalGraphOperations.at(graphDb);
-			
+
 			for (Node n : op.getAllNodes()) {
-				sendNodeAdded(sourceId, Long.toString(n.getId()));
+				String nodeId = Long.toString(n.getId());
+				sendNodeAdded(sourceId, nodeId);
+
+				for (String key : n.getPropertyKeys())
+					sendNodeAttributeAdded(sourceId, nodeId, key,
+							n.getProperty(key));
 			}
-			
+
 			for (Relationship e : op.getAllRelationships()) {
+				String edgeId = Long.toString(e.getId());
 				Node src = e.getStartNode();
 				Node trg = e.getEndNode();
 
-				sendEdgeAdded(sourceId, Long.toString(e.getId()),
-						Long.toString(src.getId()), Long.toString(trg.getId()),
-						false);
+				sendEdgeAdded(sourceId, edgeId, Long.toString(src.getId()),
+						Long.toString(trg.getId()), false);
+
+				for (String key : e.getPropertyKeys())
+					sendEdgeAttributeAdded(sourceId, edgeId, key,
+							e.getProperty(key));
 			}
 
 			t.success();
+		} catch (Throwable e) {
+			t.failure();
 		} finally {
 			t.finish();
 		}
 	}
 
-	public void readAll(String fileName) throws IOException {
-		openDB(fileName);
+	public void connect(String dbPath) throws DatabaseConnectionException {
+		if (graphDb != null)
+			throw new DatabaseConnectionException(
+					"A graph database is already opened");
+
+		graphDb = factory.newEmbeddedDatabase(dbPath);
+		graphDb.registerTransactionEventHandler(this);
+
 		flushDB();
-		closeDB();
 	}
 
-	public void readAll(URL url) throws IOException {
-		throw new UnsupportedOperationException();
-	}
+	public void disconnect() throws DatabaseConnectionException {
+		if (graphDb == null)
+			throw new DatabaseConnectionException("No graph database is opened");
 
-	public void readAll(InputStream stream) throws IOException {
-		throw new UnsupportedOperationException();
-	}
-
-	public void readAll(Reader reader) throws IOException {
-		throw new UnsupportedOperationException();
-	}
-
-	public void begin(String fileName) throws IOException {
-		openDB(fileName);
-	}
-
-	public void begin(URL url) throws IOException {
-		throw new UnsupportedOperationException();
-	}
-
-	public void begin(InputStream stream) throws IOException {
-		throw new UnsupportedOperationException();
-	}
-
-	public void begin(Reader reader) throws IOException {
-		throw new UnsupportedOperationException();
-	}
-
-	public boolean nextEvents() throws IOException {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	public boolean nextStep() throws IOException {
-		// TODO Auto-generated method stub
-		return false;
-	}
-
-	public void end() throws IOException {
-		closeDB();
+		graphDb.shutdown();
+		graphDb = null;
 	}
 
 	public void afterCommit(TransactionData arg0, Object arg1) {
@@ -132,14 +107,36 @@ public class Neo4JSource extends SourceBase implements FileSource,
 		// TODO Auto-generated method stub
 		return null;
 	}
-	
-	public static void main(String ... args) throws Exception {
+
+	private class CloseDbOnExit extends Thread {
+		public void run() {
+			if (graphDb != null)
+				try {
+					disconnect();
+				} catch (DatabaseConnectionException e) {
+
+				}
+		}
+	}
+
+	public static void main(String... args) throws Exception {
 		Neo4JSource src = new Neo4JSource();
 		Graph g = new AdjacencyListGraph("g");
+
+		g.addAttribute("ui.quality");
+		g.addAttribute("ui.antilias");
+
 		src.addSink(g);
-		
+
 		g.display(true);
+
+		//src.addSink(new VerboseSink());
+
+		if (args != null && args.length > 0)
+			src.connect(args[0]);
+		else
+			src.connect("dataset/twitter");
 		
-		src.readAll(args[0]);
+		src.disconnect();
 	}
 }
