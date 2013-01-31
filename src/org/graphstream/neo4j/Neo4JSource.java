@@ -5,6 +5,8 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.net.URL;
 
+import org.graphstream.graph.Graph;
+import org.graphstream.graph.implementations.AdjacencyListGraph;
 import org.graphstream.stream.SourceBase;
 import org.graphstream.stream.file.FileSource;
 import org.graphstream.util.VerboseSink;
@@ -60,7 +62,7 @@ public class Neo4JSource extends SourceBase implements FileSource,
 
 				sendEdgeAdded(sourceId, Long.toString(e.getId()),
 						Long.toString(src.getId()), Long.toString(trg.getId()),
-						true);
+						false);
 			}
 
 			t.success();
@@ -134,7 +136,11 @@ public class Neo4JSource extends SourceBase implements FileSource,
 	
 	public static void main(String ... args) throws Exception {
 		Neo4JSource src = new Neo4JSource();
-		src.addSink(new VerboseSink());
+		Graph g = new AdjacencyListGraph("g");
+		src.addSink(g);
+		
+		g.display(true);
+		
 		src.readAll(args[0]);
 	}
 }
