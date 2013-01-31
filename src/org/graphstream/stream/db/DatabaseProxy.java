@@ -29,18 +29,25 @@
  */
 package org.graphstream.stream.db;
 
-public class DatabaseConnectionException extends Exception {
-	private static final long serialVersionUID = -8612784493661690409L;
+import org.graphstream.stream.Pipe;
 
-	public DatabaseConnectionException(Throwable cause) {
-		super(cause);
-	}
-
-	public DatabaseConnectionException(String message, Object... args) {
-		super(String.format(message, args));
+public interface DatabaseProxy extends Pipe {
+	public static enum Mode {
+		READ_ONLY, WRITE_ONLY, READ_WRITE
 	}
 	
-	public DatabaseConnectionException() {
-		
-	}
+	/**
+	 * Connect to a graph database.
+	 * 
+	 * @param dbPath
+	 *            path to the database
+	 * @throws DatabaseConnectionException
+	 *             thrown if an error occurs while the source tries to connect
+	 */
+	void connect(String dbPath, Mode mode) throws DatabaseConnectionException;
+
+	/**
+	 * Disconnect a connected database source.
+	 */
+	void disconnect() throws DatabaseConnectionException;
 }

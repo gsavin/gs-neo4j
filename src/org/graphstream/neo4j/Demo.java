@@ -27,20 +27,31 @@
  * The fact that you are presently reading this means that you have had
  * knowledge of the CeCILL-C and LGPL licenses and that you accept their terms.
  */
-package org.graphstream.stream.db;
+package org.graphstream.neo4j;
 
-public class DatabaseConnectionException extends Exception {
-	private static final long serialVersionUID = -8612784493661690409L;
+import org.graphstream.graph.Graph;
+import org.graphstream.graph.implementations.AdjacencyListGraph;
+import org.graphstream.stream.db.DatabaseProxy.Mode;
 
-	public DatabaseConnectionException(Throwable cause) {
-		super(cause);
+public class Demo {
+	public static void main(String... args) throws Exception {
+		Neo4JProxy src = new Neo4JProxy();
+		Graph g = new AdjacencyListGraph("g");
+
+		g.addAttribute("ui.quality");
+		g.addAttribute("ui.antialias");
+		g.addAttribute("ui.stylesheet", "node { fill-color: rgba(38, 38, 38, 100); } edge { fill-color: rgba(38, 38, 38, 50); }");
+
+		src.addSink(g);
+
+		g.display(true);
+
+		if (args != null && args.length > 0)
+			src.connect(args[0], Mode.READ_ONLY);
+		else
+			src.connect("dataset/twitter", Mode.READ_ONLY);
+
+		src.disconnect();
 	}
 
-	public DatabaseConnectionException(String message, Object... args) {
-		super(String.format(message, args));
-	}
-	
-	public DatabaseConnectionException() {
-		
-	}
 }
