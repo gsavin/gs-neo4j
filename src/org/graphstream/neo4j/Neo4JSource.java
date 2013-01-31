@@ -9,7 +9,6 @@ import org.graphstream.graph.Graph;
 import org.graphstream.graph.implementations.AdjacencyListGraph;
 import org.graphstream.stream.SourceBase;
 import org.graphstream.stream.file.FileSource;
-import org.graphstream.util.VerboseSink;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
@@ -33,7 +32,7 @@ public class Neo4JSource extends SourceBase implements FileSource,
 			throw new RuntimeException("A graph database is already opened");
 
 		graphDb = factory.newEmbeddedDatabase(path);
-		graphDb.registerTransactionEventHandler(null);
+		graphDb.registerTransactionEventHandler(this);
 	}
 
 	protected void closeDB() {
