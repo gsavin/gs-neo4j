@@ -135,6 +135,6 @@ public class Neo4JSource extends SourceBase implements FileSource,
 	public static void main(String ... args) throws Exception {
 		Neo4JSource src = new Neo4JSource();
 		src.addSink(new VerboseSink());
-		src.readAll("dataset/drwho/");
+		src.readAll(args[0]);
 	}
 }
